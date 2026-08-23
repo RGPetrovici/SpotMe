@@ -4,16 +4,14 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-// 1. IMPORTAMOS SUPABASE (LA MAGIA DE LA NUBE)
 import { supabase } from '../supabase';
 
 export default function SetupScreen() {
   const router = useRouter();
-
   const [step, setStep] = useState(1);
-  const [guardando, setGuardando] = useState(false); // 👈 Nuevo estado para la ruedecita de carga
-  const TOTAL_STEPS = 5;
+  const [guardando, setGuardando] = useState(false);
+  // AUMENTAMOS A 6 PASOS
+  const TOTAL_STEPS = 6;
 
   // ==========================
   // ESTADOS: PASO 1 
@@ -21,11 +19,9 @@ export default function SetupScreen() {
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [genero, setGenero] = useState(''); 
-  
   const [dia, setDia] = useState('');
   const [mes, setMes] = useState('');
   const [ano, setAno] = useState('');
-  
   const [showDia, setShowDia] = useState(false);
   const [showMes, setShowMes] = useState(false);
   const [showAno, setShowAno] = useState(false);
@@ -42,14 +38,11 @@ export default function SetupScreen() {
     if (['Abr', 'Jun', 'Sep', 'Nov'].includes(m)) return 30;
     return 31;
   };
-  
   const DIAS = Array.from({length: getMaxDays(mes, ano)}, (_, i) => (i + 1).toString());
 
   const handleMonthYearChange = (newMes: string, newAno: string) => {
     const maxDays = getMaxDays(newMes, newAno);
-    if (dia && parseInt(dia) > maxDays) {
-      setDia('');
-    }
+    if (dia && parseInt(dia) > maxDays) setDia('');
   };
 
   const getEdad = () => {
@@ -58,9 +51,7 @@ export default function SetupScreen() {
     const today = new Date('2026-07-12');
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
   };
   const edadCalculada = getEdad();
@@ -69,6 +60,7 @@ export default function SetupScreen() {
   // ==========================
   // ESTADOS: PASO 2 
   // ==========================
+  const [ciudad, setCiudad] = useState('Madrid');
   const [tipoLugar, setTipoLugar] = useState(''); 
   const [nombreGym, setNombreGym] = useState('');
   const [zonaSeleccionada, setZonaSeleccionada] = useState('');
@@ -79,53 +71,78 @@ export default function SetupScreen() {
     'Moncloa', 'Latina', 'Carabanchel', 'Usera', 'Puente de Vallecas', 'Moratalaz', 'Ciudad Lineal'
   ];
 
-  const [horario, setHorario] = useState(''); 
+  const [horarios, setHorarios] = useState<string[]>([]); 
   const [horaDesde, setHoraDesde] = useState('');
   const [horaHasta, setHoraHasta] = useState('');
-  const [showDesde, setShowDesde] = useState(false);
-  const [showHasta, setShowHasta] = useState(false);
 
-  const HORAS_TODAS = Array.from({length: 18}, (_, i) => `${(i + 6).toString().padStart(2, '0')}:00`); 
-  const HORAS_HASTA = horaDesde ? HORAS_TODAS.filter(h => parseInt(h.split(':')[0]) > parseInt(horaDesde.split(':')[0])) : [];
+  const toggleHorario = (opcion: string) => {
+    if (opcion === 'rango') {
+      setHorarios(['rango']);
+    } else {
+      let nuevos = horarios.filter(h => h !== 'rango');
+      if (nuevos.includes(opcion)) {
+        nuevos = nuevos.filter(h => h !== opcion);
+      } else {
+        nuevos.push(opcion);
+      }
+      setHorarios(nuevos);
+    }
+  };
 
   // ==========================
-  // ESTADOS: PASO 3 & 4
+  // ESTADOS: PASO 3 (DEPORTES)
+  // ==========================
+  const [deportes, setDeportes] = useState<string[]>([]); 
+
+  const toggleDeporte = (opcion: string) => {
+    if (deportes.includes(opcion)) {
+      setDeportes(deportes.filter(d => d !== opcion));
+    } else {
+      setDeportes([...deportes, opcion]);
+    }
+  };
+
+  // ==========================
+  // ESTADOS: PASO 4 (PREFERENCIAS)
   // ==========================
   const [preferencia, setPreferencia] = useState(''); 
+
+  // ==========================
+  // ESTADOS: PASO 5 (FOTOS)
+  // ==========================
   const [fotos, setFotos] = useState<string[]>([]);
 
   // ==========================
-  // LÓGICA DE SUPABASE (NUEVO)
+  // LÓGICA DE SUPABASE 
   // ==========================
   const guardarPerfilEnSupabase = async () => {
     setGuardando(true);
     try {
-      // 1. Averiguamos quién es el usuario que acaba de registrarse y loguearse
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        Alert.alert("Error", "No hemos encontrado tu cuenta. Por favor, vuelve a iniciar sesión.");
+        Alert.alert("Error", "No hemos encontrado tu cuenta.");
         setGuardando(false);
         return;
       }
 
-      // 2. Preparamos el paquete de datos para mandarlo a la tabla 'perfiles'
+      const horarioFinal = horarios.includes('rango') ? `${horaDesde}-${horaHasta}` : horarios.join(' y ');
+
       const { error } = await supabase
         .from('perfiles')
         .insert({
-          id: user.id, // Súper importante: enlazamos su perfil con su login
+          id: user.id,
           nombre: nombre,
+          apellido: apellido, // 👈 ¡AQUÍ ESTÁ! Ahora sí lo mandamos a la nube
           edad: edadCalculada,
           gym: tipoLugar === 'gym' ? nombreGym : 'Entrena por zona',
           zona: tipoLugar === 'zona' ? zonaSeleccionada : 'Madrid',
           bio: '¡Hola! Soy nuevo en SpotMe. Busco compis para reventar PRs 💪.',
           fotos: fotos,
-          etiquetas: [preferencia, horario]
+          etiquetas: [preferencia, horarioFinal, ...deportes] 
         });
 
-      if (error) throw error; // Si la base de datos se queja, paramos
-
-      // 3. ¡Bingo! Todo guardado, lo mandamos al Feed.
+      if (error) throw error;
       router.replace('/feed'); 
       
     } catch (error: any) {
@@ -143,31 +160,21 @@ export default function SetupScreen() {
     if (step === 1) return nombre.trim() !== '' && apellido.trim() !== '' && dia !== '' && mes !== '' && ano !== '' && genero !== '' && esMayorDeEdad;
     if (step === 2) {
       const lugarOk = tipoLugar === 'zona' ? zonaSeleccionada !== '' : (tipoLugar === 'gym' ? nombreGym.trim() !== '' : false);
-      const tiempoOk = horario === 'rango' ? (horaDesde !== '' && horaHasta !== '') : horario !== '';
+      const tiempoOk = horarios.includes('rango') ? (horaDesde !== '' && horaHasta !== '') : horarios.length > 0;
       return lugarOk && tiempoOk;
     }
-    if (step === 3) return preferencia !== '';
-    if (step === 4) return true; // (Retorna true temporalmente para pruebas sin foto real)
+    if (step === 3) return deportes.length > 0; // PASO 3: Solo deportes
+    if (step === 4) return preferencia !== '';  // PASO 4: Solo preferencias
+    if (step === 5) return true; // PASO 5: Fotos
+    if (step === 6) return true; // PASO 6: Final
     return true;
   };
 
   const isNextEnabled = isStepValid();
 
   const handleNext = () => {
-    if (!isNextEnabled) {
-      if (step === 1) {
-        if (!nombre || !apellido) Alert.alert("Faltan datos", "Por favor, escribe tu nombre y apellidos.");
-        else if (!dia || !mes || !ano) Alert.alert("Faltan datos", "Completa tu fecha de nacimiento.");
-        else if (!esMayorDeEdad) Alert.alert("Restricción de edad", "Debes ser mayor de 18 años para usar SpotMe.");
-        else if (!genero) Alert.alert("Faltan datos", "Por favor, selecciona tu género.");
-      } else if (step === 2) {
-        // ... (resto de tus alertas originales)
-      }
-      return;
-    }
-
-    if (step === 5) {
-      // 👈 AQUÍ LLAMAMOS A NUESTRA MAGIA DE SUPABASE
+    if (!isNextEnabled) return;
+    if (step === 6) { // AHORA EL ÚLTIMO PASO ES EL 6
       guardarPerfilEnSupabase();
       return;
     }
@@ -180,22 +187,18 @@ export default function SetupScreen() {
   };
 
   const simularSubirFoto = () => {
-    if (fotos.length < 4) {
-      setFotos([...fotos, 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=200&auto=format&fit=crop']);
-    }
+    if (fotos.length < 4) setFotos([...fotos, 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=200&auto=format&fit=crop']);
   };
 
   const closeAllDropdowns = () => {
-    setShowDia(false); setShowMes(false); setShowAno(false);
-    setShowZona(false); setShowDesde(false); setShowHasta(false);
+    setShowDia(false); setShowMes(false); setShowAno(false); setShowZona(false);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       
-      {/* HEADER & BARRA PROGRESO */}
-      {step < 5 && (
+      {step < 6 && (
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#E11D48" />
@@ -210,7 +213,7 @@ export default function SetupScreen() {
         </View>
       )}
 
-      {step < 5 && (
+      {step < 6 && (
         <View style={styles.progressContainer}>
           <LinearGradient colors={['#E11D48', '#d946ef']} style={[styles.progressBar, { width: `${(step / TOTAL_STEPS) * 100}%` }]} start={{x: 0, y: 0}} end={{x: 1, y: 0}} />
         </View>
@@ -219,9 +222,7 @@ export default function SetupScreen() {
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScrollBeginDrag={closeAllDropdowns}>
           
-          {/* ==================================== */}
-          {/* PASO 1: DATOS BÁSICOS                */}
-          {/* ==================================== */}
+          {/* PASO 1 */}
           {step === 1 && (
             <View style={styles.stepBox}>
               <Text style={styles.titleCenter}>Tus datos básicos</Text>
@@ -265,11 +266,7 @@ export default function SetupScreen() {
                     <View style={styles.dropdownList}>
                       <ScrollView nestedScrollEnabled style={{maxHeight: 180}}><View onStartShouldSetResponder={() => true}>
                         {MESES.map(m => (
-                          <TouchableOpacity key={m} style={styles.dropdownItem} onPress={() => {
-                            setMes(m); 
-                            setShowMes(false);
-                            handleMonthYearChange(m, ano);
-                          }}>
+                          <TouchableOpacity key={m} style={styles.dropdownItem} onPress={() => { setMes(m); setShowMes(false); handleMonthYearChange(m, ano); }}>
                             <Text style={styles.dropdownItemText}>{m}</Text>
                           </TouchableOpacity>
                         ))}
@@ -287,11 +284,7 @@ export default function SetupScreen() {
                     <View style={styles.dropdownList}>
                       <ScrollView nestedScrollEnabled style={{maxHeight: 180}}><View onStartShouldSetResponder={() => true}>
                         {ANOS.map(a => (
-                          <TouchableOpacity key={a} style={styles.dropdownItem} onPress={() => {
-                            setAno(a); 
-                            setShowAno(false);
-                            handleMonthYearChange(mes, a);
-                          }}>
+                          <TouchableOpacity key={a} style={styles.dropdownItem} onPress={() => { setAno(a); setShowAno(false); handleMonthYearChange(mes, a); }}>
                             <Text style={styles.dropdownItemText}>{a}</Text>
                           </TouchableOpacity>
                         ))}
@@ -325,13 +318,17 @@ export default function SetupScreen() {
             </View>
           )}
 
-          {/* ==================================== */}
-          {/* PASO 2: LUGAR Y HORARIO */}
-          {/* ==================================== */}
+          {/* PASO 2 */}
           {step === 2 && (
             <View style={styles.stepBox}>
               <Text style={styles.titleCenter}>¿Dónde y cuándo entrenas?</Text>
               <Text style={styles.subtitleCenter}>Podrás cambiar esto más adelante en ajustes.</Text>
+
+              <Text style={styles.sectionLabel}>TU CIUDAD</Text>
+              <TouchableOpacity style={[styles.cardBtnCenterWide, {borderColor: '#E11D48', backgroundColor: '#fff1f2', marginBottom: 24}]} activeOpacity={0.8}>
+                <Ionicons name="location-outline" size={20} color="#E11D48" style={{marginRight: 8}} />
+                <Text style={[styles.cardBtnText, {color: '#111827', fontWeight: 'bold'}]}>{ciudad}</Text>
+              </TouchableOpacity>
 
               <Text style={styles.sectionLabel}>LUGAR DE ENTRENAMIENTO</Text>
               <View style={[styles.rowGrid, {marginBottom: 16}]}>
@@ -374,39 +371,63 @@ export default function SetupScreen() {
                 </View>
               )}
 
-              <Text style={styles.sectionLabel}>TU HORARIO HABITUAL</Text>
+              <Text style={styles.sectionLabel}>TU HORARIO HABITUAL (Puedes elegir varios)</Text>
               <View style={[styles.rowGrid, {marginBottom: 16}]}>
-                <TouchableOpacity style={[styles.cardBtn, horario === 'manana' && styles.cardBtnActive]} onPress={() => {setHorario('manana'); setHoraDesde(''); setHoraHasta(''); setShowDesde(false); setShowHasta(false);}}>
-                  <Ionicons name="partly-sunny-outline" size={26} color={horario === 'manana' ? '#E11D48' : '#6b7280'} style={{marginBottom: 8}}/>
-                  <Text style={[styles.cardBtnText, horario === 'manana' && styles.cardBtnTextActive]}>Mañana</Text>
+                <TouchableOpacity style={[styles.cardBtn, horarios.includes('Mañana') && styles.cardBtnActive]} onPress={() => toggleHorario('Mañana')}>
+                  <Ionicons name="partly-sunny-outline" size={26} color={horarios.includes('Mañana') ? '#E11D48' : '#6b7280'} style={{marginBottom: 8}}/>
+                  <Text style={[styles.cardBtnText, horarios.includes('Mañana') && styles.cardBtnTextActive]}>Mañana</Text>
                   <Text style={styles.cardBtnSub}>(6:00-14:00)</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.cardBtn, horario === 'tarde' && styles.cardBtnActive]} onPress={() => {setHorario('tarde'); setHoraDesde(''); setHoraHasta(''); setShowDesde(false); setShowHasta(false);}}>
-                  <Ionicons name="sunny-outline" size={26} color={horario === 'tarde' ? '#E11D48' : '#6b7280'} style={{marginBottom: 8}}/>
-                  <Text style={[styles.cardBtnText, horario === 'tarde' && styles.cardBtnTextActive]}>Tarde</Text>
+                <TouchableOpacity style={[styles.cardBtn, horarios.includes('Tarde') && styles.cardBtnActive]} onPress={() => toggleHorario('Tarde')}>
+                  <Ionicons name="sunny-outline" size={26} color={horarios.includes('Tarde') ? '#E11D48' : '#6b7280'} style={{marginBottom: 8}}/>
+                  <Text style={[styles.cardBtnText, horarios.includes('Tarde') && styles.cardBtnTextActive]}>Tarde</Text>
                   <Text style={styles.cardBtnSub}>(14:00-20:00)</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.cardBtn, horario === 'noche' && styles.cardBtnActive]} onPress={() => {setHorario('noche'); setHoraDesde(''); setHoraHasta(''); setShowDesde(false); setShowHasta(false);}}>
-                  <Ionicons name="moon-outline" size={26} color={horario === 'noche' ? '#E11D48' : '#6b7280'} style={{marginBottom: 8}}/>
-                  <Text style={[styles.cardBtnText, horario === 'noche' && styles.cardBtnTextActive]}>Noche</Text>
+                <TouchableOpacity style={[styles.cardBtn, horarios.includes('Noche') && styles.cardBtnActive]} onPress={() => toggleHorario('Noche')}>
+                  <Ionicons name="moon-outline" size={26} color={horarios.includes('Noche') ? '#E11D48' : '#6b7280'} style={{marginBottom: 8}}/>
+                  <Text style={[styles.cardBtnText, horarios.includes('Noche') && styles.cardBtnTextActive]}>Noche</Text>
                   <Text style={styles.cardBtnSub}>(20:00-23:00)</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={{paddingBottom: 20}}>
-                <TouchableOpacity style={[styles.cardBtnCenterWide, horario === 'rango' && styles.cardBtnActive]} onPress={() => setHorario('rango')} activeOpacity={0.8}>
-                  <Ionicons name="time-outline" size={20} color={horario === 'rango' ? '#E11D48' : '#6b7280'} style={{marginRight: 8}} />
-                  <Text style={[styles.cardBtnText, horario === 'rango' && styles.cardBtnTextActive]}>Hora en particular</Text>
+                <TouchableOpacity style={[styles.cardBtnCenterWide, horarios.includes('rango') && styles.cardBtnActive]} onPress={() => toggleHorario('rango')} activeOpacity={0.8}>
+                  <Ionicons name="time-outline" size={20} color={horarios.includes('rango') ? '#E11D48' : '#6b7280'} style={{marginRight: 8}} />
+                  <Text style={[styles.cardBtnText, horarios.includes('rango') && styles.cardBtnTextActive]}>Hora en particular</Text>
                 </TouchableOpacity>
               </View>
-
             </View>
           )}
 
-          {/* ==================================== */}
-          {/* PASO 3: PREFERENCIAS                 */}
-          {/* ==================================== */}
+          {/* PASO 3: AHORA ES SOLO DEPORTES */}
           {step === 3 && (
+            <View style={styles.stepBox}>
+              <Text style={styles.titleCenter}>¿Qué te gusta hacer?</Text>
+              <Text style={styles.subtitleCenter}>Puedes elegir varias disciplinas.</Text>
+              
+              <View style={styles.sportsGrid2x2}>
+                <TouchableOpacity style={[styles.sportCard, deportes.includes('Pesas / Fuerza') && styles.sportCardActive]} onPress={() => toggleDeporte('Pesas / Fuerza')}>
+                  <MaterialCommunityIcons name="dumbbell" size={32} color={deportes.includes('Pesas / Fuerza') ? '#E11D48' : '#6b7280'} />
+                  <Text style={[styles.sportCardText, deportes.includes('Pesas / Fuerza') && styles.sportCardTextActive]}>Pesas / Fuerza</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.sportCard, deportes.includes('CrossFit') && styles.sportCardActive]} onPress={() => toggleDeporte('CrossFit')}>
+                  <MaterialCommunityIcons name="kettlebell" size={32} color={deportes.includes('CrossFit') ? '#E11D48' : '#6b7280'} />
+                  <Text style={[styles.sportCardText, deportes.includes('CrossFit') && styles.sportCardTextActive]}>CrossFit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.sportCard, deportes.includes('Calistenia') && styles.sportCardActive]} onPress={() => toggleDeporte('Calistenia')}>
+                  <MaterialCommunityIcons name="human-handsup" size={32} color={deportes.includes('Calistenia') ? '#E11D48' : '#6b7280'} />
+                  <Text style={[styles.sportCardText, deportes.includes('Calistenia') && styles.sportCardTextActive]}>Calistenia</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.sportCard, deportes.includes('HIIT / Funcional') && styles.sportCardActive]} onPress={() => toggleDeporte('HIIT / Funcional')}>
+                  <Ionicons name="flash" size={32} color={deportes.includes('HIIT / Funcional') ? '#E11D48' : '#6b7280'} />
+                  <Text style={[styles.sportCardText, deportes.includes('HIIT / Funcional') && styles.sportCardTextActive]}>HIIT / Funcional</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* PASO 4: AHORA ES SOLO PREFERENCIAS */}
+          {step === 4 && (
             <View style={styles.stepBox}>
               <Text style={styles.titleCenter}>¿Con quién buscas entrenar?</Text>
               <Text style={styles.subtitleCenter}>Podrás cambiar esto más adelante en ajustes.</Text>
@@ -430,23 +451,21 @@ export default function SetupScreen() {
             </View>
           )}
 
-          {/* ==================================== */}
-          {/* PASO 4: FOTOS                        */}
-          {/* ==================================== */}
-          {step === 4 && (
+          {/* PASO 5: FOTOS */}
+          {step === 5 && (
             <View style={styles.stepBox}>
               <Text style={styles.titleCenter}>Añade tus fotos</Text>
               
               <View style={styles.infoAlert}>
                 <Ionicons name="bulb-outline" size={24} color="#f59e0b" />
                 <Text style={styles.infoAlertText}>
-                  Subir <Text style={{fontWeight: 'bold'}}>2 o más fotos</Text> inspirará mucha más confianza al resto de usuarios y seguramente quieran entrenar contigo más gente.
+                  Subir <Text style={{fontWeight: 'bold'}}>2 o más fotos</Text> inspirará mucha más confianza al resto de usuarios.
                 </Text>
               </View>
 
               <View style={styles.photosGrid}>
                 <TouchableOpacity style={styles.photoMain} onPress={simularSubirFoto} activeOpacity={0.8}>
-                  {fotos.length > 0 && typeof fotos[0] === 'string' && fotos[0].startsWith('http') ? (
+                  {fotos.length > 0 ? (
                     <Image source={{uri: fotos[0]}} style={styles.photoImgMain} />
                   ) : (
                     <View style={{alignItems: 'center'}}>
@@ -460,7 +479,7 @@ export default function SetupScreen() {
                 <View style={styles.photosSubGrid}>
                   {[1, 2, 3].map((index) => (
                     <TouchableOpacity key={index} style={styles.photoSub} onPress={simularSubirFoto} activeOpacity={0.8}>
-                      {fotos.length > index && typeof fotos[index] === 'string' && fotos[index].startsWith('http') ? (
+                      {fotos.length > index ? (
                         <Image source={{uri: fotos[index]}} style={styles.photoImgSub} />
                       ) : (
                         <Ionicons name="add" size={28} color="#9ca3af" />
@@ -472,10 +491,8 @@ export default function SetupScreen() {
             </View>
           )}
 
-          {/* ==================================== */}
-          {/* PASO 5: EL GRÁFICO CIENTÍFICO        */}
-          {/* ==================================== */}
-          {step === 5 && (
+          {/* PASO 6: GRÁFICO */}
+          {step === 6 && (
             <View style={styles.hypeContainer}>
               <View style={styles.hypeTop}>
                 <Text style={styles.hypeTitle}>¡Todo listo, {nombre || 'Compi'}!</Text>
@@ -492,13 +509,10 @@ export default function SetupScreen() {
                 </View>
 
                 <View style={styles.barsArea}>
-                  {/* Barra Entrenar Solo */}
                   <View style={styles.singleBarCol}>
                     <View style={[styles.barShape, {height: '35%', backgroundColor: '#cbd5e1'}]} />
                     <Text style={styles.barLabel}>Entrenar{"\n"}solo</Text>
                   </View>
-
-                  {/* Barra SpotMe */}
                   <View style={styles.singleBarCol}>
                     <View style={[styles.barShape, {height: '100%', backgroundColor: '#E11D48'}]}>
                       <LinearGradient colors={['#E11D48', '#d946ef']} style={{flex: 1, borderRadius: 12}} start={{x:0, y:1}} end={{x:0, y:0}} />
@@ -516,31 +530,28 @@ export default function SetupScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* BOTÓN PRINCIPAL */}
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.mainBtn, !isNextEnabled && styles.mainBtnDisabled, step === 5 && styles.mainBtnFinal]} 
+          style={[styles.mainBtn, !isNextEnabled && styles.mainBtnDisabled, step === 6 && styles.mainBtnFinal]} 
           onPress={handleNext} 
           activeOpacity={isNextEnabled && !guardando ? 0.9 : 1}
           disabled={guardando || !isNextEnabled}
         >
-          {step === 5 && !guardando && <LinearGradient colors={['#E11D48', '#d946ef']} style={styles.mainBtnGradient} start={{x:0, y:0}} end={{x:1, y:0}} />}
+          {step === 6 && !guardando && <LinearGradient colors={['#E11D48', '#d946ef']} style={styles.mainBtnGradient} start={{x:0, y:0}} end={{x:1, y:0}} />}
           
           {guardando ? (
             <ActivityIndicator color="#E11D48" size="large" />
           ) : (
-            <Text style={[styles.mainBtnText, !isNextEnabled && styles.mainBtnTextDisabled, step === 5 && {color: '#ffffff'}]}>
-              {step === 5 ? 'Empezar a descubrir' : 'Siguiente'}
+            <Text style={[styles.mainBtnText, !isNextEnabled && styles.mainBtnTextDisabled, step === 6 && {color: '#ffffff'}]}>
+              {step === 6 ? 'Empezar a descubrir' : 'Siguiente'}
             </Text>
           )}
         </TouchableOpacity>
       </View>
-
     </SafeAreaView>
   );
 }
 
-// ========= ESTILOS INTACTOS =========
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 40 : 16, paddingBottom: 16, backgroundColor: '#ffffff' },
@@ -558,7 +569,6 @@ const styles = StyleSheet.create({
   subtitleCenter: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 28 },
   sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#6b7280', letterSpacing: 1, marginBottom: 12 },
   label: { fontSize: 14, fontWeight: 'bold', color: '#374151', marginBottom: 8 },
-  miniLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },
   input: { backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 16 },
   ageMessageText: { fontSize: 14, fontWeight: 'bold', marginTop: 4, marginBottom: 16 },
   ageTextSuccess: { color: '#10b981' },
@@ -566,8 +576,8 @@ const styles = StyleSheet.create({
   pickerBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 12, paddingVertical: 14, borderRadius: 12 },
   pickerBoxLargo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 12 },
   pickerText: { fontSize: 15, color: '#111827', fontWeight: '500' },
-  dropdownList: { position: 'absolute', top: 52, left: 0, right: 0, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, zIndex: 100, ...Platform.select({ web: { boxShadow: '0px 4px 12px rgba(0,0,0,0.1)' }, default: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 5 }}) },
-  dropdownListLarga: { position: 'absolute', top: 60, left: 0, right: 0, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, zIndex: 100, ...Platform.select({ web: { boxShadow: '0px 4px 12px rgba(0,0,0,0.1)' }, default: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 5 }}) },
+  dropdownList: { position: 'absolute', top: 52, left: 0, right: 0, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, zIndex: 100 },
+  dropdownListLarga: { position: 'absolute', top: 60, left: 0, right: 0, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, zIndex: 100 },
   dropdownItem: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   dropdownItemText: { fontSize: 15, color: '#4b5563', textAlign: 'center' },
   rowGrid: { flexDirection: 'row', gap: 12 },
@@ -579,6 +589,13 @@ const styles = StyleSheet.create({
   cardBtnText: { color: '#4b5563', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   cardBtnTextActive: { color: '#E11D48', fontWeight: 'bold' },
   cardBtnSub: { fontSize: 11, color: '#9ca3af', marginTop: 4 },
+  
+  sportsGrid2x2: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  sportCard: { width: '48%', backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
+  sportCardActive: { borderColor: '#E11D48', backgroundColor: '#fff1f2', borderWidth: 1.5 },
+  sportCardText: { color: '#4b5563', fontSize: 14, fontWeight: '600', marginTop: 12 },
+  sportCardTextActive: { color: '#E11D48', fontWeight: 'bold' },
+
   bigCardBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', padding: 18, borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb' },
   bigCardBtnActive: { borderColor: '#E11D48', backgroundColor: '#fff1f2', borderWidth: 1.5 },
   bigCardBtnText: { color: '#4b5563', fontSize: 16, fontWeight: '600', marginLeft: 16 },
@@ -605,7 +622,7 @@ const styles = StyleSheet.create({
   singleBarCol: { width: '35%', height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
   barShape: { width: '100%', borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   barLabel: { position: 'absolute', bottom: -45, textAlign: 'center', fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  rocketBadge: { position: 'absolute', top: -25, backgroundColor: '#ffffff', borderRadius: 20, padding: 4, ...Platform.select({ web: { boxShadow: '0px 4px 12px rgba(0,0,0,0.15)' }, default: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 5 }}) },
+  rocketBadge: { position: 'absolute', top: -25, backgroundColor: '#ffffff', borderRadius: 20, padding: 4 },
   footer: { paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 32 : 24, paddingTop: 16, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   mainBtn: { width: '100%', paddingVertical: 18, borderRadius: 16, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
   mainBtnDisabled: { backgroundColor: '#e2e8f0' },
