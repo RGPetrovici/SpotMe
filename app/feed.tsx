@@ -26,6 +26,8 @@ export default function FeedScreen() {
   
   const [matchData, setMatchData] = useState<any>(null);
 
+  const [hayNotificaciones, setHayNotificaciones] = useState(false);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const position = useRef(new Animated.ValueXY()).current;
   
@@ -112,6 +114,25 @@ export default function FeedScreen() {
     }
 
     cargarCompis();
+  }, []);
+
+  useEffect(() => {
+    async function comprobarNotificaciones() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Buscamos si hay algún mensaje donde tú seas el receptor y no esté leído
+      const { count } = await supabase
+        .from('mensajes')
+        .select('*', { count: 'exact', head: true })
+        .eq('receptor_id', user.id)
+        .eq('leido', false);
+
+      if (count && count > 0) {
+        setHayNotificaciones(true);
+      }
+    }
+    comprobarNotificaciones();
   }, []);
 
   const toggleExpand = () => {
@@ -386,7 +407,14 @@ export default function FeedScreen() {
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/profile')}><Ionicons name="person-outline" size={26} color="#6b7280" /></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/feed')}><MaterialCommunityIcons name="cards-outline" size={28} color="#E11D48" /></TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/chats')}><Ionicons name="chatbubbles-outline" size={26} color="#6b7280" /></TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/chats')}>
+  <View style={{position: 'relative'}}>
+    <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" />
+    {hayNotificaciones && (
+      <View style={{ position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#f1f5f9' }} />
+    )}
+  </View>
+</TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/store')}><MaterialCommunityIcons name="lightning-bolt" size={28} color="#6b7280" /></TouchableOpacity>
       </View>
       <StatusBar style="dark" />

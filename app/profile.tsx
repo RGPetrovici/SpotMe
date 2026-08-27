@@ -4,30 +4,27 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// 1. IMPORTAMOS SUPABASE
 import { supabase } from '../supabase';
 
 export default function ProfileScreen() {
   const router = useRouter();
 
-  // 2. ESTADOS PARA GUARDAR NUESTROS DATOS REALES
   const [perfilReal, setPerfilReal] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
+  
+  const [hayNotificaciones, setHayNotificaciones] = useState(false);
 
-  // 3. BUSCAMOS NUESTROS DATOS AL ABRIR LA PANTALLA
   useEffect(() => {
     async function cargarMiPerfil() {
       try {
-        // ¿Quién soy?
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
-          // Buscamos mi fila en la tabla 'perfiles'
           const { data, error } = await supabase
             .from('perfiles')
             .select('*')
             .eq('id', user.id)
-            .single(); // Solo queremos un perfil (el mío)
+            .single(); 
 
           if (error) throw error;
           if (data) setPerfilReal(data);
@@ -42,7 +39,48 @@ export default function ProfileScreen() {
     cargarMiPerfil();
   }, []);
 
-  // DATOS MOCK DE GAMIFICACIÓN (Estos los dejamos fijos por ahora)
+  useEffect(() => {
+    async function comprobarNotificaciones() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { count } = await supabase
+        .from('mensajes')
+        .select('*', { count: 'exact', head: true })
+        .eq('receptor_id', user.id)
+        .eq('leido', false);
+
+      if (count && count > 0) {
+        setHayNotificaciones(true);
+      }
+    }
+    comprobarNotificaciones();
+  }, []);
+
+  // 🔥 NUEVA FUNCIÓN: Menú de ajustes y Cerrar Sesión
+  const abrirAjustes = () => {
+    Alert.alert(
+      "Ajustes de cuenta",
+      "¿Qué deseas hacer?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Cerrar sesión", 
+          style: "destructive", // Lo pone en rojo en iOS
+          onPress: async () => {
+            const { error } = await supabase.auth.signOut();
+            if (!error) {
+              // Te mandamos a la pantalla inicial (Login/Registro)
+              router.replace('/'); 
+            } else {
+              Alert.alert("Error", "No se pudo cerrar la sesión.");
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   const GAMIFICACION = {
     tokens: 14,
     rachaSemanas: 3,
@@ -56,38 +94,30 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       
-      {/* HEADER TIPO DASHBOARD */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mi Perfil</Text>
-        <TouchableOpacity style={styles.iconButton} onPress={() => Alert.alert("Ajustes", "Aquí irían los ajustes de cuenta, notificaciones, etc.")}>
+        {/* 🔥 ACTUALIZADO: Botón de la tuerca conectado a la función abrirAjustes */}
+        <TouchableOpacity style={styles.iconButton} onPress={abrirAjustes}>
           <Ionicons name="settings-outline" size={26} color="#111827" />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        
-        {/* ============================================== */}
-        {/* CABECERA: FOTO, COMPLETADO Y BOTÓN EDITAR */}
-        {/* ============================================== */}
         <View style={styles.topProfileSection}>
-          
           {cargando ? (
             <View style={{height: 120, justifyContent: 'center'}}>
               <ActivityIndicator size="large" color="#E11D48" />
             </View>
           ) : (
             <>
-              {/* Leemos la foto de Supabase, o ponemos una por defecto si no subió ninguna */}
               <Image 
                 source={{ uri: perfilReal?.fotos?.[0] || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=300&auto=format&fit=crop' }} 
                 style={styles.avatarLarge} 
               />
-              {/* Leemos el nombre de Supabase */}
               <Text style={styles.nameText}>{perfilReal?.nombre || 'Compi'}</Text>
             </>
           )}
 
-          {/* BARRA DE PROGRESO */}
           <View style={styles.progressContainer}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressText}>Perfil al 75%</Text>
@@ -98,7 +128,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* BOTÓN PARA IR A LA NUEVA PANTALLA DE EDICIÓN */}
           <TouchableOpacity 
             style={styles.editBtn} 
             activeOpacity={0.8}
@@ -108,14 +137,9 @@ export default function ProfileScreen() {
             <Text style={styles.editBtnText}>Editar Perfil y Preferencias</Text>
           </TouchableOpacity>
         </View>
-
-        {/* ============================================== */}
-        {/* PANEL DE CONTROL: LO QUE NO PUEDES EDITAR */}
-        {/* ============================================== */}
         
         <Text style={styles.sectionTitleMain}>ESTADO Y REPUTACIÓN</Text>
         
-        {/* CÓMO TE VE LA COMUNIDAD */}
         <View style={styles.reputationCard}>
           <Text style={styles.reputationTitle}>Cómo te ve la comunidad</Text>
           <Text style={styles.reputationSub}>Estas etiquetas te las han dado otros usuarios tras entrenar contigo.</Text>
@@ -129,7 +153,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ESTADO DE LA CUENTA */}
         <View style={styles.statusCard}>
           <View style={styles.statusRow}>
             <View style={styles.statusIconBox}>
@@ -142,14 +165,9 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.statusDesc}>No tienes reportes de la comunidad ni has dejado tirado a nadie.</Text>
         </View>
-
-        {/* ============================================== */}
-        {/* ZONA GAMIFICACIÓN Y RECOMPENSAS */}
-        {/* ============================================== */}
         
         <Text style={styles.sectionTitleMain}>TU RED SPOTME</Text>
 
-        {/* GYM BROS OFICIALES */}
         <View style={styles.brosCard}>
           <View style={styles.brosHeader}>
             <Text style={styles.brosTitle}>Gym Bros Oficiales</Text>
@@ -177,7 +195,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* RACHA Y TOKENS */}
         <View style={styles.gamificationContainer}>
           
           <View style={styles.streakRow}>
@@ -205,7 +222,6 @@ export default function ProfileScreen() {
         <View style={{height: 100}} /> 
       </ScrollView>
 
-      {/* BARRA DE NAVEGACIÓN INFERIOR OFICIAL */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/profile')}>
           <Ionicons name="person" size={26} color="#E11D48" /> 
@@ -216,7 +232,12 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/chats')}>
-          <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" />
+         <View style={{position: 'relative'}}>
+           <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" />
+           {hayNotificaciones && (
+             <View style={{ position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#f1f5f9' }} />
+            )}
+         </View>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/store')}>

@@ -53,6 +53,8 @@ export default function ChatIndividualScreen() {
 
       if (data) setMensajes(data);
       setCargando(false);
+      // Marcamos como leídos los mensajes que me enviaron a mí
+      await supabase.from('mensajes').update({ leido: true }).eq('receptor_id', user.id).eq('emisor_id', idCompi).eq('leido', false);
       
       setTimeout(() => { scrollViewRef.current?.scrollToEnd({ animated: false }); }, 200);
     }

@@ -1,18 +1,19 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// 🔥 SOLUCIONADO: Faltaba esta línea para poder hablar con la base de datos
+import { supabase } from '../supabase';
 
 export default function StoreScreen() {
   const router = useRouter();
 
-  // ESTADOS
-  const [tokens, setTokens] = useState(25); // 25 de inicio para el tutorial
-  const [pasoActual, setPasoActual] = useState(1); // Ahora va del 1 al 5
+  const [tokens, setTokens] = useState(25); 
+  const [pasoActual, setPasoActual] = useState(1); 
   const [verTodosPasos, setVerTodosPasos] = useState(false);
 
-  // LISTA DEL TUTORIAL (El Camino del Novato - 5 Pasos rápidos)
   const APRENDIZAJE = [
     { id: 1, titulo: "Perfil de Acero", desc: "Añade al menos 3 fotos a tu perfil." },
     { id: 2, titulo: "El Radar", desc: "Dale 'Like' a 3 perfiles en la pestaña Explorar." },
@@ -21,7 +22,6 @@ export default function StoreScreen() {
     { id: 5, titulo: "Cazador de Gotas", desc: "Mira un anuncio para finalizar el tutorial (arriba)." },
   ];
 
-  // MISIONES EXTRA (Se muestran en carrusel)
   const MISIONES_EXTRA = [
     { titulo: "Perfil 100%", desc: "Completa todos tus datos.", recompensa: 10 },
     { titulo: "Valora la app", desc: "Déjanos 5 estrellas.", recompensa: 15 },
@@ -45,11 +45,31 @@ export default function StoreScreen() {
     if (tokens >= coste) {
       setTokens(prev => prev - coste);
       Alert.alert("¡Éxito!", `Beneficio activado. Has gastado ${coste} 💧.`);
-      if (pasoActual === 3) setPasoActual(4); // Avanza si está en el paso de comprar
+      if (pasoActual === 3) setPasoActual(4); 
     } else {
       Alert.alert("Saldo Insuficiente", "No tienes suficientes Tokens de Sudor.");
     }
   };
+
+  const [hayNotificaciones, setHayNotificaciones] = useState(false);
+
+  useEffect(() => {
+    async function comprobarNotificaciones() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { count } = await supabase
+        .from('mensajes')
+        .select('*', { count: 'exact', head: true })
+        .eq('receptor_id', user.id)
+        .eq('leido', false);
+
+      if (count && count > 0) {
+        setHayNotificaciones(true);
+      }
+    }
+    comprobarNotificaciones();
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -62,10 +82,6 @@ export default function StoreScreen() {
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        
-        {/* ============================================== */}
-        {/* 1. ANUNCIO DIARIO FIJO ARRIBA */}
-        {/* ============================================== */}
         <View style={styles.adCard}>
           <View style={styles.adIconBox}><Ionicons name="play" size={24} color="#10b981" /></View>
           <View style={styles.adInfo}>
@@ -75,15 +91,12 @@ export default function StoreScreen() {
           <TouchableOpacity style={styles.adBtn} onPress={() => {
             setTokens(prev => prev + 4);
             Alert.alert("¡Gracias!", "Has ganado +4 💧");
-            if (pasoActual === 5) setPasoActual(6); // Si es el último paso, se gradúa
+            if (pasoActual === 5) setPasoActual(6); 
           }}>
             <Text style={styles.adBtnText}>+4 💧</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ============================================== */}
-        {/* 2. PRIMEROS PASOS (TUTORIAL) */}
-        {/* ============================================== */}
         <View style={styles.sectionHeader}>
           <Ionicons name="school" size={20} color="#3b82f6" />
           <Text style={styles.sectionTitle}>PRIMEROS PASOS</Text>
@@ -95,7 +108,6 @@ export default function StoreScreen() {
             <View style={styles.learningRewardBadge}><Text style={styles.learningRewardText}>🎁 +20 💧 al acabar</Text></View>
           </View>
           
-          {/* BARRA DE PROGRESO CORREGIDA */}
           <View style={styles.progressRow}>
              <View style={[styles.progressBarFill, {width: `${(Math.min(pasoActual-1, totalPasos)) * (100 / totalPasos)}%`}]} />
           </View>
@@ -123,7 +135,6 @@ export default function StoreScreen() {
             <Ionicons name={verTodosPasos ? "chevron-up" : "chevron-down"} size={16} color="#6b7280" />
           </TouchableOpacity>
 
-          {/* LISTA DESPLEGABLE DE PASOS */}
           {verTodosPasos && (
             <View style={styles.stepsList}>
               {APRENDIZAJE.map((paso) => {
@@ -142,9 +153,6 @@ export default function StoreScreen() {
           )}
         </View>
 
-        {/* ============================================== */}
-        {/* 3. MISIONES EXTRA (CARRUSEL HORIZONTAL) */}
-        {/* ============================================== */}
         <View style={[styles.sectionHeader, {marginTop: 24}, !isAprendizajeCompletado && {opacity: 0.5}]}>
           <Ionicons name="star" size={20} color="#f59e0b" />
           <Text style={styles.sectionTitle}>MISIONES EXTRA</Text>
@@ -155,7 +163,7 @@ export default function StoreScreen() {
           showsHorizontalScrollIndicator={false} 
           style={[styles.extrasScroll, !isAprendizajeCompletado && {opacity: 0.5}]} 
           contentContainerStyle={{paddingRight: 16}}
-          pointerEvents={isAprendizajeCompletado ? "auto" : "none"} // Bloquea los toques si no ha acabado
+          pointerEvents={isAprendizajeCompletado ? "auto" : "none"} 
         >
           {MISIONES_EXTRA.map((extra, index) => (
             <View key={index} style={styles.extraCard}>
@@ -168,9 +176,6 @@ export default function StoreScreen() {
           ))}
         </ScrollView>
 
-        {/* ============================================== */}
-        {/* 4. RETOS AVANZADOS (SEMANAL Y MENSUAL) */}
-        {/* ============================================== */}
         <View style={[styles.sectionHeader, {marginTop: 16}]}>
           <Ionicons name="flame" size={20} color="#E11D48" />
           <Text style={styles.sectionTitle}>RETOS AVANZADOS</Text>
@@ -208,9 +213,6 @@ export default function StoreScreen() {
           <View style={styles.darkMissionPill}><Text style={styles.darkMissionPillText}>+50 💧</Text></View>
         </View>
 
-        {/* ============================================== */}
-        {/* 5. GASTAR TOKENS (Tus Ventajas) */}
-        {/* ============================================== */}
         <View style={[styles.sectionHeader, {marginTop: 24}]}>
           <Ionicons name="cart" size={20} color="#E11D48" />
           <Text style={styles.sectionTitle}>TUS VENTAJAS</Text>
@@ -235,9 +237,6 @@ export default function StoreScreen() {
 
         </View>
 
-        {/* ============================================== */}
-        {/* 6. COMPRAR MÁS (€) */}
-        {/* ============================================== */}
         <View style={styles.dividerMain} />
         <Text style={styles.buyMoreTitle}>¿Necesitas un empujón?</Text>
         <View style={styles.buyContainer}>
@@ -251,13 +250,19 @@ export default function StoreScreen() {
         <View style={{height: 100}} /> 
       </ScrollView>
 
-      {/* BARRA DE NAVEGACIÓN INFERIOR OFICIAL */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/profile')}><Ionicons name="person-outline" size={26} color="#6b7280" /></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/feed')}><MaterialCommunityIcons name="cards-outline" size={28} color="#6b7280" /></TouchableOpacity>
+        
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/chats')}>
-          <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" /><View style={styles.navBadge} /> 
+          <View style={{position: 'relative'}}>
+            <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" />
+            {hayNotificaciones && (
+              <View style={{ position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#f1f5f9' }} />
+           )}
+          </View>
         </TouchableOpacity>
+        
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/store')}><MaterialCommunityIcons name="lightning-bolt" size={28} color="#E11D48" /></TouchableOpacity>
       </View>
       <StatusBar style="dark" />
