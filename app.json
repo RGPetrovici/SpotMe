@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "CopiaCompiFit-Valencia",
-    "slug": "CopiaCompiFit-Valencia",
+    "name": "SpotMe",
+    "slug": "SpotMe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

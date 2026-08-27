@@ -6,6 +6,24 @@ import { ActivityIndicator, Image, Platform, SafeAreaView, ScrollView, StyleShee
 
 import { supabase } from '../supabase';
 
+// Datos de la agenda integrados directamente
+const datosAgenda = [
+  {
+    id: '1',
+    partnerName: 'Carlos Ruiz',
+    date: 'Hoy, 18:30',
+    location: 'Basic-Fit (Centro)',
+    workoutSplit: 'Pecho y Tríceps',
+  },
+  {
+    id: '2',
+    partnerName: 'Marta Gómez',
+    date: 'Mañana, 09:15',
+    location: 'Synergym',
+    workoutSplit: 'Pierna',
+  },
+];
+
 export default function ChatsScreen() {
   const router = useRouter();
   
@@ -63,7 +81,6 @@ export default function ChatsScreen() {
                 }
               }
 
-              // 🔥 AQUÍ ESTÁ LA MAGIA: Calculamos si debe mostrar punto/negrita
               const mostrarNotificacion = noLeidos > 0 || esMatchNuevo;
 
               return {
@@ -115,7 +132,7 @@ export default function ChatsScreen() {
           <Text style={[styles.tabBtnText, tabActual === 'Mensajes' ? styles.tabBtnTextActive : null]}>Mensajes</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, tabActual === 'Agenda' ? styles.tabBtnActive : null]} onPress={() => setTabActual('Agenda')} activeOpacity={0.8}>
-          <Text style={[styles.tabBtnText, tabActual === 'Agenda' ? styles.tabBtnTextActive : null]}>Agenda (0)</Text>
+          <Text style={[styles.tabBtnText, tabActual === 'Agenda' ? styles.tabBtnTextActive : null]}>Agenda (2)</Text>
         </TouchableOpacity>
       </View>
 
@@ -196,9 +213,42 @@ export default function ChatsScreen() {
           )}
 
           {tabActual === 'Agenda' && (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="calendar-outline" size={64} color="#e5e7eb" />
-              <Text style={styles.emptyStateText}>No tienes entrenos programados aún.</Text>
+            <View style={styles.agendaListContainer}>
+              {datosAgenda.map((item) => (
+                <View key={item.id} style={styles.agendaCard}>
+                  
+                  <View style={styles.agendaHeader}>
+                    <View style={styles.agendaAvatarPlaceholder}>
+                      <Text style={styles.agendaAvatarText}>{item.partnerName.charAt(0)}</Text>
+                    </View>
+                    <View style={styles.agendaHeaderText}>
+                      <Text style={styles.agendaName}>{item.partnerName}</Text>
+                      <Text style={styles.agendaWorkoutType}>Rutina: {item.workoutSplit}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.agendaDetailsContainer}>
+                    <View style={styles.agendaDetailRow}>
+                      <Ionicons name="time-outline" size={18} color="#666" />
+                      <Text style={styles.agendaDetailText}>{item.date}</Text>
+                    </View>
+                    <View style={styles.agendaDetailRow}>
+                      <Ionicons name="location-outline" size={18} color="#666" />
+                      <Text style={styles.agendaDetailText}>{item.location}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.agendaActions}>
+                    <TouchableOpacity style={[styles.agendaButton, styles.agendaBtnOutline]} activeOpacity={0.8}>
+                      <Text style={styles.agendaBtnOutlineText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.agendaButton, styles.agendaBtnPrimary]} activeOpacity={0.8}>
+                      <Text style={styles.agendaBtnPrimaryText}>Chat</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                </View>
+              ))}
             </View>
           )}
         </ScrollView>
@@ -256,5 +306,24 @@ const styles = StyleSheet.create({
   emptyStateTextList: { color: '#9ca3af', paddingHorizontal: 20, fontStyle: 'italic' },
   bottomNav: { backgroundColor: '#ffffff', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
   navItem: { alignItems: 'center', padding: 8, position: 'relative' },
-  navRedDot: { position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#ffffff' }
+  navRedDot: { position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#ffffff' },
+  
+  // Estilos nuevos para la Agenda
+  agendaListContainer: { paddingHorizontal: 20, paddingBottom: 80 },
+  agendaCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#eee', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  agendaHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  agendaAvatarPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  agendaAvatarText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  agendaHeaderText: { flex: 1 },
+  agendaName: { fontSize: 16, fontWeight: 'bold', color: '#111' },
+  agendaWorkoutType: { fontSize: 13, color: '#666', marginTop: 2 },
+  agendaDetailsContainer: { backgroundColor: '#f8f9fa', borderRadius: 8, padding: 12, marginBottom: 16 },
+  agendaDetailRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
+  agendaDetailText: { marginLeft: 8, fontSize: 14, color: '#444' },
+  agendaActions: { flexDirection: 'row', justifyContent: 'space-between' },
+  agendaButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  agendaBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#e5e7eb', marginRight: 8 },
+  agendaBtnOutlineText: { color: '#4b5563', fontWeight: '600' },
+  agendaBtnPrimary: { backgroundColor: '#111827', marginLeft: 8 },
+  agendaBtnPrimaryText: { color: '#fff', fontWeight: '600' }
 });

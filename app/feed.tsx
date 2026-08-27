@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { supabase } from '../supabase';
 
@@ -52,28 +52,28 @@ export default function FeedScreen() {
           }
         }
 
-        // 🔥 NUEVO: BUSCAMOS A QUIÉN YA HEMOS DESLIZADO (LIKES Y DISLIKES)
         const { data: misInteracciones } = await supabase
           .from('likes')
           .select('usuario_destino')
           .eq('usuario_origen', user?.id);
 
-        // Creamos una lista negra con sus IDs, y añadimos nuestro propio ID para no vernos a nosotros
         const idsIgnorados = misInteracciones ? misInteracciones.map(i => i.usuario_destino) : [];
         if (user) idsIgnorados.push(user.id);
 
-        // Traemos a todos los usuarios
         const { data, error } = await supabase.from('perfiles').select('*');
 
         if (error) throw error;
 
         if (data) {
-          // 🔥 NUEVO: FILTRAMOS A LA GENTE PARA ENSEÑAR SOLO A LOS QUE NO ESTÁN EN LA LISTA NEGRA
           const usuariosNuevos = data.filter(u => !idsIgnorados.includes(u.id));
 
           const perfilesMapeados = usuariosNuevos.map(u => {
             const preferencia = (u.etiquetas && u.etiquetas[0]) ? u.etiquetas[0] : 'Compi';
-            const horarioReal = (u.etiquetas && u.etiquetas[1]) ? u.etiquetas[1] : 'Tardes';
+            
+            // 🔥 PARCHE DE LA Ñ: Forzamos que si en Supabase pone "manana", se cambie a "Mañana"
+            let horarioReal = (u.etiquetas && u.etiquetas[1]) ? u.etiquetas[1] : 'Tardes';
+            horarioReal = horarioReal.replace(/manana/gi, 'Mañana');
+            horarioReal = horarioReal.charAt(0).toUpperCase() + horarioReal.slice(1);
             
             const deportesGuardados = (u.etiquetas && u.etiquetas.length > 2) ? u.etiquetas.slice(2) : [];
             const deportesMapeados = deportesGuardados.map((dep: string) => {
@@ -94,7 +94,7 @@ export default function FeedScreen() {
               zona: u.zona || 'Madrid',
               etiquetas: [{ id: '1', icon: '🔥', title: `Busca: ${preferencia}` }],
               bio: u.bio || '¡Hola! Busco compis para entrenar.',
-              horario: horarioReal.toUpperCase(),
+              horario: horarioReal,
               foto: (u.fotos && u.fotos.length > 0 && u.fotos[0]) ? u.fotos[0] : 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=300&auto=format&fit=crop',
               fotosExtra: (u.fotos && u.fotos.length > 1) ? u.fotos.slice(1) : ['https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=300&auto=format&fit=crop'],
               deportes: deportesMapeados, 
@@ -121,7 +121,6 @@ export default function FeedScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Buscamos si hay algún mensaje donde tú seas el receptor y no esté leído
       const { count } = await supabase
         .from('mensajes')
         .select('*', { count: 'exact', head: true })
@@ -279,7 +278,6 @@ export default function FeedScreen() {
               activeOpacity={0.8}
               onPress={() => {
                 setMatchData(null);
-                // Viajamos directo al chat
                 router.push({ pathname: '/elchat', params: { id: matchData?.id, nombre: matchData?.nombre } });
               }}
             >
@@ -340,8 +338,9 @@ export default function FeedScreen() {
                             <Text style={styles.nameText}>{PERFIL_ACTUAL.nombre}, {PERFIL_ACTUAL.edad}</Text>
                           </View>
                           
-                          <TouchableOpacity style={[styles.expandButton, isExpanded && { backgroundColor: '#374151' }]} onPress={toggleExpand} activeOpacity={0.8}>
-                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={24} color="#ffffff" />
+                          <TouchableOpacity 
+                            style={[styles.expandButton, isExpanded ? styles.expandButtonExpanded : styles.expandButtonCollapsed]} onPress={toggleExpand} activeOpacity={0.8}>
+                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={24} color={isExpanded ? "#111827" : "#ffffff"} />
                           </TouchableOpacity>
                         </View>
 
@@ -360,9 +359,11 @@ export default function FeedScreen() {
                       </View>
                     </View>
 
+                    {/* 🔥 CORREGIDO: Estética OSCURA premium para los detalles */}
                     <View style={styles.detailsContainer}>
                       <Text style={styles.sectionTitle}>Sobre mí</Text>
                       <Text style={styles.bioText}>{PERFIL_ACTUAL.bio}</Text>
+                      
                       <View style={styles.divider} />
 
                       <Text style={styles.sectionTitle}>Horario habitual</Text>
@@ -370,6 +371,7 @@ export default function FeedScreen() {
                         <Ionicons name="time-outline" size={20} color="#e11d48" style={styles.infoIcon} />
                         <Text style={styles.infoTextValue}>{PERFIL_ACTUAL.horario}</Text>
                       </View>
+                      
                       <View style={styles.divider} />
 
                       <Text style={styles.sectionTitle}>Disciplinas</Text>
@@ -408,13 +410,13 @@ export default function FeedScreen() {
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/profile')}><Ionicons name="person-outline" size={26} color="#6b7280" /></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/feed')}><MaterialCommunityIcons name="cards-outline" size={28} color="#E11D48" /></TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/chats')}>
-  <View style={{position: 'relative'}}>
-    <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" />
-    {hayNotificaciones && (
-      <View style={{ position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#f1f5f9' }} />
-    )}
-  </View>
-</TouchableOpacity>
+          <View style={{position: 'relative'}}>
+            <Ionicons name="chatbubbles-outline" size={26} color="#6b7280" />
+            {hayNotificaciones && (
+              <View style={{ position: 'absolute', top: -2, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: '#E11D48', borderWidth: 2, borderColor: '#f1f5f9' }} />
+            )}
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={() => router.replace('/store')}><MaterialCommunityIcons name="lightning-bolt" size={28} color="#6b7280" /></TouchableOpacity>
       </View>
       <StatusBar style="dark" />
@@ -432,19 +434,23 @@ const styles = StyleSheet.create({
   mainContainer: { flex: 1, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 },
   animatedWrapper: { flex: 1, zIndex: 10 },
   fireAuraBorder: { flex: 1, padding: 3, borderRadius: 27 },
-  card: { flex: 1, backgroundColor: '#111827', borderRadius: 24, overflow: 'hidden' },
+  card: { flex: 1, backgroundColor: '#111827', borderRadius: 24, overflow: 'hidden' }, // 🔥 Restaurado a fondo oscuro
   cardInnerFuego: { borderRadius: 24 },
   profileImage: { width: '100%', height: '100%', resizeMode: 'cover', position: 'absolute' },
   imageGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' },
   infoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, zIndex: 10 },
   nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
   nameText: { color: '#ffffff', fontSize: 32, fontWeight: '900', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: {width: 0, height: 2}, textShadowRadius: 4 },
-  expandButton: { backgroundColor: '#E11D48', width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
+  expandButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginLeft: 10, borderWidth: 1 },
+  expandButtonCollapsed: { backgroundColor: '#E11D48', borderColor: '#E11D48' },
+  expandButtonExpanded: { backgroundColor: '#ffffff', borderColor: '#ffffff', ...Platform.select({ web: { boxShadow: '0px 4px 12px rgba(0,0,0,0.15)' }, default: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 }}) },
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   tagPill: { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },
   tagPillText: { color: '#ffffff', fontSize: 13, fontWeight: '600' },
   locationPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: '#E11D48', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
   locationText: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
+  
+  // 🔥 ESTILOS OSCUROS PARA LA SECCIÓN INFERIOR
   detailsContainer: { backgroundColor: '#111827', padding: 24, paddingBottom: 60, minHeight: 400 },
   sectionTitle: { color: '#9ca3af', fontSize: 13, fontWeight: 'bold', letterSpacing: 1, marginBottom: 12, textTransform: 'uppercase' },
   bioText: { fontSize: 18, color: '#ffffff', fontStyle: 'italic', fontWeight: '500', lineHeight: 26, marginBottom: 16 },
@@ -453,8 +459,9 @@ const styles = StyleSheet.create({
   infoIcon: { marginRight: 12 },
   infoTextValue: { fontSize: 16, color: '#ffffff', fontWeight: '600' },
   sportsList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, 
-  sportItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12 },
-  sportText: { fontSize: 15, color: '#ffffff', marginLeft: 6, fontWeight: '600' },
+  sportItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)' },
+  sportText: { fontSize: 15, color: '#ffffff', marginLeft: 6, fontWeight: '700' },
+  
   actionButtonsContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 32, paddingTop: 16, paddingBottom: 8 },
   dislikeButton: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb' },
   emojiIcon: { fontSize: 24 },
