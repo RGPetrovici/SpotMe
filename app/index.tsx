@@ -16,7 +16,6 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [cargando, setCargando] = useState(false);
 
-  // LA FUNCIÓN ARREGLADA QUE TE LLEVA AL FEED
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Faltan datos", "Por favor, escribe tu correo y contraseña.");
@@ -25,7 +24,6 @@ export default function LoginScreen() {
 
     setCargando(true);
     
-    // Hablamos con Supabase para ver si el usuario existe
     const { error } = await supabase.auth.signInWithPassword({ 
       email, 
       password 
@@ -34,9 +32,9 @@ export default function LoginScreen() {
     setCargando(false);
 
     if (error) {
-      Alert.alert("Error al iniciar sesión", error.message);
+      // 🔥 SEGURIDAD APLICADA: Mensaje genérico para evitar la enumeración de usuarios
+      Alert.alert("Error al iniciar sesión", "Correo o contraseña incorrectos.");
     } else {
-      // ¡BINGO! Quitamos el Alert antiguo y te mandamos directo a la app
       router.replace('/feed'); 
     }
   };
